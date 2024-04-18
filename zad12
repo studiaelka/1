@@ -1,0 +1,198 @@
+// W TIMER_3 odkomentuj to zadanie, ktĂłre chcesz wykonaÄ
+
+#include <c8051F060.h>
+
+#define LED_DISPLAY_PORT 	P2
+#define DATABUS_PORT		P7
+
+void LatchDataBusValue (unsigned char);
+void WatchDog_Init (void);
+void Timer3_Init(void);
+void PORT_Init (void);
+void zad1(void);
+void zad2(void);
+void zad3(void);
+
+sfr16 RCAP3		= 0xCA;               // Timer3 reload value register
+sfr16 TMR3     	= 0xCC;               // Timer3 counter register
+
+sbit D_FLIP_FLOP_CLK = P5^6;
+
+//bit	flaga = 0;
+int index = 0;
+unsigned int nr_of_setoffs = 0;
+int offset = 0;
+
+unsigned char DisplayPortValue = 0xFE;
+unsigned char code long_text[] = {0x73, 0x79, 0x77, 0x39, 0x76};
+unsigned char code long_text2[] = {0x73, 0x79, 0x77, 0x39, 0x76, 0x3f, 0x5b, 0x66, 0x7d, 0x73, 0x79, 0x77, 0x39};
+// 									P 	  E 	A 	  C 	H 	  0 	2 	  4 	6	  P 	E 	  A 	C
+unsigned char code display[] = {0xFE, 0xFD, 0xFB, 0xF7, 0xEF};
+//unsigned char code display2[] = {0xFE, 0xFD, 0xFB, 0xF7, 0xEF};
+unsigned char k=0;
+
+
+int main (void)
+{
+	WatchDog_Init ();
+	Timer3_Init();
+	PORT_Init ();
+
+	EA = 1; 				//wlaczenie obslugi przerwan
+
+	LatchDataBusValue (0x00);
+
+	LED_DISPLAY_PORT = DisplayPortValue;
+
+	SFRPAGE = CONFIG_PAGE;
+	
+	while(1){
+		//StaticText();
+	}
+
+	return 0;
+}
+
+//------------------------------------------------------------------------------------
+// PORT_Init
+//------------------------------------------------------------------------------------
+//
+// Configure the Crossbar and GPIO ports
+//
+
+
+void LatchDataBusValue (unsigned char DataBusValue)
+{
+	unsigned char old_SFRPAGE;
+	char	i = 0;
+
+    old_SFRPAGE = SFRPAGE;
+	SFRPAGE = CONFIG_PAGE;
+	
+	DATABUS_PORT = DataBusValue;
+
+	D_FLIP_FLOP_CLK = 0;
+    for (i = 0; i < 4; i++); 	
+	D_FLIP_FLOP_CLK = 1;
+
+	SFRPAGE = old_SFRPAGE;		
+	return;
+}
+
+
+void WatchDog_Init (void)
+{
+ 	WDTCN = 0xde;	// disable watchdog timer
+ 	WDTCN = 0xad;	
+	return;
+}
+
+void PORT_Init (void)
+{
+    SFRPAGE   = CONFIG_PAGE;
+    XBR2      = 0x40;			// Enable crossbar and weak pull-ups
+	return;
+}
+
+void Timer3_Init(void)
+{
+	SFRPAGE   = TMR3_PAGE;
+//	RCAP3     = 0x0;     			// Init reload values
+	RCAP3     = 0xfd00;
+   	TMR3      = 0xffff;         // Set to reload immediately
+	TMR3CN    = 0x04;
+   	TMR3CF    = 0x00;
+   	EIE2      = 0x01;           // Enable Timer3 interrupts
+	SFRPAGE   = CONFIG_PAGE;
+	return;
+}
+
+void TIMER3_ISR (void) interrupt 14
+{
+	unsigned char old_SFRPAGE;
+	char i = 0;
+	TF3 = 0; 					 // Clear interrupt flag
+    old_SFRPAGE = SFRPAGE;
+	SFRPAGE   = CONFIG_PAGE;
+	
+//	zad1();
+//	zad2();
+//	zad3();
+	
+	SFRPAGE = old_SFRPAGE;
+	return;
+}
+
+void zad1(void){
+	LatchDataBusValue(0x00);
+	LED_DISPLAY_PORT = display[index];
+	LatchDataBusValue(long_text[index]); 
+	index++;
+	if (index == 5) index = 0;
+}
+
+void zad2(void){
+	if (offset == 9) offset = 0;
+//	if (LED_DISPLAY_PORT == 0xdf) LED_DISPLAY_PORT = 0xfe;
+	LatchDataBusValue(0x00);
+	LED_DISPLAY_PORT = display[index];
+//	LED_DISPLAY_PORT = (LED_DISPLAY_PORT << 1) | (LED_DISPLAY_PORT >> 7);
+	LatchDataBusValue(long_text2[index + offset]);
+	index++;
+	if (index == 5) index = 0;
+	nr_of_setoffs++;
+	if (nr_of_setoffs % 200 == 0) offset++;
+}
+
+void zad3(void){
+	LatchDataBusValue(0x00);
+	LED_DISPLAY_PORT = 0xfe;
+	
+	P5 = 0xFF;
+
+//	LatchDataBusValue(przycisk1);
+//	LatchDataBusValue(P5);
+
+	switch(P5){
+	case 0x67:
+	if (offset == 9) offset = 0;
+//	if (LED_DISPLAY_PORT == 0xdf) LED_DISPLAY_PORT = 0xfe;
+	LatchDataBusValue(0x00);
+	LED_DISPLAY_PORT = display[index];
+//	LED_DISPLAY_PORT = (LED_DISPLAY_PORT << 1) | (LED_DISPLAY_PORT >> 7);
+	LatchDataBusValue(long_text2[index + offset]);
+	index++;
+	if (index == 5) index = 0;
+	nr_of_setoffs++;
+	if (nr_of_setoffs % 160 == 0) offset++;
+		break;
+	case 0x57:
+		LatchDataBusValue(0x00);
+		LED_DISPLAY_PORT = display[k];
+		LatchDataBusValue(long_text2[k + offset]);
+		k++;
+		if(k==5) k=0;
+		break;
+	case 0x47:
+		LatchDataBusValue(0x00);
+		LED_DISPLAY_PORT = display[k];
+		LatchDataBusValue(long_text2[k + offset]);
+		k++;
+		if(k==5) k=0;
+		break;
+	default:
+		zad2();
+		break;
+	}
+//	if (przycisk1 == 0x63){
+//		LatchDataBusValue(0x73); //P
+//	} 
+//	
+//	else {
+//		LatchDataBusValue(0x79); //E
+//	}
+//
+
+//	zad2();	
+
+} 
